@@ -1,0 +1,84 @@
+package controller;
+
+import database.ChambreDAO;
+import model.Chambre;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.sql.Connection;
+import java.util.List;
+
+public class DisponibiliteView {
+    private TableView<Chambre> tableDisponibles;
+    private TableView<Chambre> tableReservees;
+
+    public void start(Stage stage, Connection conn) {
+        ChambreDAO dao = new ChambreDAO(conn);
+
+        tableDisponibles = creerTable();
+        tableReservees = creerTable();
+
+        // Charger les données
+        chargerTables(dao);
+
+        // Bouton de rafraîchissement
+        Button btnRefresh = new Button("Rafraîchir");
+        btnRefresh.setOnAction(e -> chargerTables(dao));
+
+        VBox boxDisponibles = new VBox(5, new Label("Chambres disponibles 🟢"), tableDisponibles);
+        VBox boxReservees = new VBox(5, new Label("Chambres réservées 🔴"), tableReservees);
+
+        HBox tables = new HBox(20, boxDisponibles, boxReservees);
+        VBox root = new VBox(10, tables, btnRefresh);
+        root.setPadding(new Insets(15));
+
+        Scene scene = new Scene(root, 800, 400);
+        stage.setScene(scene);
+        stage.setTitle("Disponibilité des chambres");
+        stage.show();
+    }
+
+    private TableView<Chambre> creerTable() {
+        TableView<Chambre> table = new TableView<>();
+
+        TableColumn<Chambre, String> colNum = new TableColumn<>("Numéro");
+        colNum.setCellValueFactory(new PropertyValueFactory<>("numero"));
+
+        TableColumn<Chambre, String> colType = new TableColumn<>("Type");
+        colType.setCellValueFactory(new PropertyValueFactory<>("type"));
+
+        TableColumn<Chambre, String> colStatut = new TableColumn<>("Statut");
+        colStatut.setCellValueFactory(new PropertyValueFactory<>("statut"));
+
+        table.getColumns().addAll(colNum, colType, colStatut);
+        table.setPrefWidth(380);
+        table.setPrefHeight(300);
+
+        return table;
+    }
+
+    private void chargerTables(ChambreDAO dao) {
+        List<Chambre> chambres = dao.getAllChambres();
+
+        ObservableList<Chambre> disponibles = FXCollections.observableArrayList();
+        ObservableList<Chambre> reservees = FXCollections.observableArrayList();
+
+        for (Chambre c : chambres) {
+            if (c.getStatut().equalsIgnoreCase("Disponible")) {
+                disponibles.add(c);
+            } else if (c.getStatut().equalsIgnoreCase("Reservee")) { // sans accent ici ✅
+                reservees.add(c);
+            }
+        }
+
+        tableDisponibles.setItems(disponibles);
+        tableReservees.setItems(reservees);
+    }
+}
