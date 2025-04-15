@@ -1,0 +1,162 @@
+package controller;
+
+import database.ChambreDAO;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import model.Chambre;
+
+import java.sql.Connection;
+import java.util.Arrays;
+import java.util.List;
+
+public class ChambreView {
+    private TableView<Chambre> table;
+    private ObservableList<Chambre> data;
+
+    public void start(Stage stage, Connection conn) {
+        ChambreDAO dao = new ChambreDAO(conn);
+        data = FXCollections.observableArrayList(dao.getAllChambres());
+
+        table = new TableView<>();
+        table.setItems(data);
+
+        TableColumn<Chambre, String> colNumero = new TableColumn<>("Numéro");
+        colNumero.setCellValueFactory(new PropertyValueFactory<>("numero"));
+
+        TableColumn<Chambre, String> colType = new TableColumn<>("Type");
+        colType.setCellValueFactory(new PropertyValueFactory<>("type"));
+
+        TableColumn<Chambre, String> colStatut = new TableColumn<>("Statut");
+        colStatut.setCellValueFactory(new PropertyValueFactory<>("statut"));
+
+        table.getColumns().addAll(colNumero, colType, colStatut);
+        table.setStyle("-fx-control-inner-background: white; -fx-text-fill: black;");
+
+        TextField tfNumero = new TextField();
+        tfNumero.setPromptText("Numéro");
+        tfNumero.setStyle("-fx-background-color: #333333; -fx-text-fill: white;");
+
+        TextField tfType = new TextField();
+        tfType.setPromptText("Type");
+        tfType.setStyle("-fx-background-color: #333333; -fx-text-fill: white;");
+
+        TextField tfStatut = new TextField();
+        tfStatut.setPromptText("Statut");
+        tfStatut.setStyle("-fx-background-color: #333333; -fx-text-fill: white;");
+
+        Button btnAjouter = new Button("Ajouter");
+        Button btnModifier = new Button("Modifier");
+        Button btnSupprimer = new Button("Supprimer");
+
+        for (Button b : new Button[]{btnAjouter, btnModifier, btnSupprimer}) {
+            b.setStyle("-fx-background-color: #e53935; -fx-text-fill: white;");
+        }
+
+        table.setOnMouseClicked(e -> {
+            Chambre selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                tfNumero.setText(selected.getNumero());
+                tfType.setText(selected.getType());
+                tfStatut.setText(selected.getStatut());
+            }
+        });
+
+        btnAjouter.setOnAction(e -> {
+            String numero = tfNumero.getText().trim();
+            String type = tfType.getText().trim();
+            String statut = tfStatut.getText().trim();
+            if (!validerChamps(numero, type, statut, dao, false)) return;
+            Chambre chambre = new Chambre(0, numero, type, statut);
+            boolean success = dao.ajouterChambre(chambre);
+            if (success) {
+                refreshTable(dao);
+                tfNumero.clear(); tfType.clear(); tfStatut.clear();
+            } else alert("Erreur lors de l'ajout.");
+        });
+
+        btnModifier.setOnAction(e -> {
+            Chambre selected = table.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                alert("Veuillez sélectionner une chambre à modifier."); return;
+            }
+            String numero = tfNumero.getText().trim();
+            String type = tfType.getText().trim();
+            String statut = tfStatut.getText().trim();
+            if (!validerChamps(numero, type, statut, dao, true)) return;
+            Chambre chambre = new Chambre(selected.getId(), numero, type, statut);
+            boolean success = dao.modifierChambre(chambre);
+            if (success) {
+                refreshTable(dao);
+                tfNumero.clear(); tfType.clear(); tfStatut.clear();
+            } else alert("Erreur lors de la modification.");
+        });
+
+        btnSupprimer.setOnAction(e -> {
+            Chambre selected = table.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                alert("Veuillez sélectionner une chambre à supprimer."); return;
+            }
+            boolean success = dao.supprimerChambre(selected.getId());
+            if (success) refreshTable(dao);
+            else alert("Échec de la suppression.");
+        });
+
+        Button btnRetour = new Button("⌂ Retour à l'accueil");
+        btnRetour.setStyle("-fx-background-color: #3f51b5; -fx-text-fill: white;");
+        btnRetour.setOnAction(e -> {
+            stage.close();
+        });
+
+        HBox form = new HBox(10, tfNumero, tfType, tfStatut, btnAjouter, btnModifier, btnSupprimer);
+        form.setAlignment(Pos.CENTER);
+
+        VBox root = new VBox(15, btnRetour, table, form);
+        root.setStyle("-fx-background-color: #1e1e1e;");
+        root.setPadding(new Insets(15));
+
+        Scene scene = new Scene(root, 900, 500);
+        stage.setScene(scene);
+        stage.setTitle("Gestion des chambres");
+        stage.show();
+    }
+
+    private void refreshTable(ChambreDAO dao) {
+        data.clear();
+        data.addAll(dao.getAllChambres());
+    }
+
+    private void alert(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setContentText(message);
+        alert.show();
+    }
+
+    private boolean validerChamps(String numero, String type, String statut, ChambreDAO dao, boolean modif) {
+        List<String> typesValides = Arrays.asList("Simple", "Double", "Suite");
+        List<String> statutsValides = Arrays.asList("Disponible", "Reservee");
+
+        if (numero.isEmpty() || type.isEmpty() || statut.isEmpty()) {
+            alert("Tous les champs sont obligatoires."); return false;
+        }
+        if (!numero.matches("\\d+")) {
+            alert("Le numéro doit contenir uniquement des chiffres !"); return false;
+        }
+        if (!typesValides.contains(type)) {
+            alert("Type invalide. Choisissez Simple, Double ou Suite."); return false;
+        }
+        if (!statutsValides.contains(statut)) {
+            alert("Statut invalide. Utilisez Disponible ou Reservee."); return false;
+        }
+        if (!modif && dao.existeNumero(numero)) {
+            alert("Ce numéro de chambre existe déjà."); return false;
+        }
+        return true;
+    }
+}
