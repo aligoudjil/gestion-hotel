@@ -1,0 +1,74 @@
+package database;
+
+import model.Reservation;
+
+import java.sql.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ReservationDAO {
+    private Connection conn;
+
+    public ReservationDAO(Connection conn) {
+        this.conn = conn;
+    }
+
+    // Ajouter une réservation
+    public boolean ajouterReservation(Reservation r) {
+        String sql = "INSERT INTO reservations (client_id, chambre_id, date_debut, date_fin) VALUES (?, ?, ?, ?)";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, r.getClientId());
+            stmt.setInt(2, r.getChambreId());
+            stmt.setDate(3, Date.valueOf(r.getDateDebut()));
+            stmt.setDate(4, Date.valueOf(r.getDateFin()));
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Supprimer une réservation
+    public boolean supprimerReservation(int id) {
+        String sql = "DELETE FROM reservations WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Lister les réservations
+    public List<Reservation> getAllReservations() {
+        List<Reservation> reservations = new ArrayList<>();
+        String sql = "SELECT * FROM reservations";
+
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Reservation r = new Reservation(
+                        rs.getInt("id"),
+                        rs.getInt("client_id"),
+                        rs.getInt("chambre_id"),
+                        rs.getDate("date_debut").toLocalDate(),
+                        rs.getDate("date_fin").toLocalDate()
+                );
+                reservations.add(r);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return reservations;
+    }
+}
+

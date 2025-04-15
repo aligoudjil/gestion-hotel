@@ -1,0 +1,60 @@
+package model;
+
+import java.time.LocalDate;
+
+public class Reservation {
+    private int id;
+    private int clientId;
+    private int chambreId;
+    private LocalDate dateDebut;
+    private LocalDate dateFin;
+
+    public Reservation(int id, int clientId, int chambreId, LocalDate dateDebut, LocalDate dateFin) {
+        this.id = id;
+        this.clientId = clientId;
+        this.chambreId = chambreId;
+        this.dateDebut = dateDebut;
+        this.dateFin = dateFin;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public int getClientId() {
+        return clientId;
+    }
+
+    public int getChambreId() {
+        return chambreId;
+    }
+
+    public LocalDate getDateDebut() {
+        return dateDebut;
+    }
+
+    public LocalDate getDateFin() {
+        return dateFin;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public void setClientId(int clientId) {
+        this.clientId = clientId;
+    }
+
+    public void setChambreId(int chambreId) {
+        this.chambreId = chambreId;
+    }
+
+    public void setDateDebut(LocalDate dateDebut) {
+        this.dateDebut = dateDebut;
+    }
+
+    public void setDateFin(LocalDate dateFin) {
+        this.dateFin = dateFin;
+    }
+}
+
