@@ -1,0 +1,174 @@
+// ReservationView.java (version stylée avec fond noir, texte blanc, boutons rouges, et table blanche)
+package controller;
+
+import database.ReservationDAO;
+import model.Reservation;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.time.LocalDate;
+
+public class ReservationView {
+    private TableView<Reservation> table;
+    private ObservableList<Reservation> data;
+
+    public void start(Stage stage, Connection conn) {
+        ReservationDAO dao = new ReservationDAO(conn);
+        data = FXCollections.observableArrayList(dao.getAllReservations());
+
+        table = new TableView<>();
+        table.setItems(data);
+        table.setStyle("-fx-background-color: white; -fx-text-fill: black;");
+
+        TableColumn<Reservation, Integer> colId = new TableColumn<>("ID");
+        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
+
+        TableColumn<Reservation, Integer> colClient = new TableColumn<>("Client ID");
+        colClient.setCellValueFactory(new PropertyValueFactory<>("clientId"));
+
+        TableColumn<Reservation, Integer> colChambre = new TableColumn<>("Chambre ID");
+        colChambre.setCellValueFactory(new PropertyValueFactory<>("chambreId"));
+
+        TableColumn<Reservation, LocalDate> colDebut = new TableColumn<>("Date début");
+        colDebut.setCellValueFactory(new PropertyValueFactory<>("dateDebut"));
+
+        TableColumn<Reservation, LocalDate> colFin = new TableColumn<>("Date fin");
+        colFin.setCellValueFactory(new PropertyValueFactory<>("dateFin"));
+
+        table.getColumns().addAll(colId, colClient, colChambre, colDebut, colFin);
+
+        TextField tfClient = new TextField();
+        tfClient.setPromptText("ID Client");
+        tfClient.setStyle("-fx-background-color: #333; -fx-text-fill: white;");
+
+        TextField tfChambre = new TextField();
+        tfChambre.setPromptText("ID Chambre");
+        tfChambre.setStyle("-fx-background-color: #333; -fx-text-fill: white;");
+
+        DatePicker dpDebut = new DatePicker();
+        dpDebut.setPromptText("Date début");
+
+        DatePicker dpFin = new DatePicker();
+        dpFin.setPromptText("Date fin");
+
+        Button btnReserver = new Button("Réserver");
+        btnReserver.setStyle("-fx-background-color: #e53935; -fx-text-fill: white;");
+
+        Button btnAnnuler = new Button("Annuler");
+        btnAnnuler.setStyle("-fx-background-color: #e53935; -fx-text-fill: white;");
+
+        Button btnRetour = new Button("⌂ Retour à l'accueil");
+        btnRetour.setStyle("-fx-background-color: #333; -fx-text-fill: white;");
+        btnRetour.setOnAction(e -> stage.close());
+
+        btnReserver.setOnAction(e -> {
+            try {
+                int clientId = Integer.parseInt(tfClient.getText());
+                int chambreId = Integer.parseInt(tfChambre.getText());
+                LocalDate debut = dpDebut.getValue();
+                LocalDate fin = dpFin.getValue();
+
+                if (debut == null || fin == null || debut.isAfter(fin)) {
+                    alert("Les dates ne sont pas valides !");
+                    return;
+                }
+
+                if (!clientExiste(conn, clientId)) {
+                    alert("Ce client n'existe pas !");
+                    return;
+                }
+
+                if (!chambreExiste(conn, chambreId)) {
+                    alert("Cette chambre n'existe pas !");
+                    return;
+                }
+
+                Reservation r = new Reservation(0, clientId, chambreId, debut, fin);
+                boolean success = dao.ajouterReservation(r);
+                if (success) {
+                    refreshTable(dao);
+                    tfClient.clear();
+                    tfChambre.clear();
+                    dpDebut.setValue(null);
+                    dpFin.setValue(null);
+                } else {
+                    alert("Erreur lors de la réservation.");
+                }
+            } catch (NumberFormatException ex) {
+                alert("ID client et ID chambre doivent être des nombres !");
+            }
+        });
+
+        btnAnnuler.setOnAction(e -> {
+            Reservation selected = table.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                alert("Sélectionnez une réservation à annuler.");
+                return;
+            }
+
+            boolean success = dao.supprimerReservation(selected.getId());
+            if (success) {
+                refreshTable(dao);
+            } else {
+                alert("Échec de la suppression.");
+            }
+        });
+
+        HBox topBar = new HBox(btnRetour);
+        topBar.setPadding(new Insets(10));
+
+        HBox form = new HBox(10, tfClient, tfChambre, dpDebut, dpFin, btnReserver, btnAnnuler);
+        form.setPadding(new Insets(10));
+
+        VBox layout = new VBox(10, topBar, table, form);
+        layout.setPadding(new Insets(10));
+        layout.setStyle("-fx-background-color: #181818;");
+
+        Scene scene = new Scene(layout, 950, 500);
+        stage.setScene(scene);
+        stage.setTitle("Réservations");
+        stage.show();
+    }
+
+    private void refreshTable(ReservationDAO dao) {
+        data.clear();
+        data.addAll(dao.getAllReservations());
+    }
+
+    private void alert(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING, message);
+        alert.show();
+    }
+
+    private boolean clientExiste(Connection conn, int clientId) {
+        try (PreparedStatement stmt = conn.prepareStatement("SELECT id FROM clients WHERE id = ?")) {
+            stmt.setInt(1, clientId);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean chambreExiste(Connection conn, int chambreId) {
+        try (PreparedStatement stmt = conn.prepareStatement("SELECT id FROM chambres WHERE id = ?")) {
+            stmt.setInt(1, chambreId);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+}
