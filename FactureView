@@ -1,0 +1,146 @@
+package controller;
+
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import database.ClientDAO;
+import database.ConnexionDB;
+import database.ReservationDAO;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.stage.Stage;
+import model.Client;
+import model.Reservation;
+
+import java.io.FileOutputStream;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+public class FactureView {
+
+    public void start(Stage stage) {
+        TableView<Reservation> table = new TableView<>();
+        table.setStyle("-fx-control-inner-background: white; -fx-table-cell-border-color: transparent;");
+
+        TableColumn<Reservation, Integer> colId = new TableColumn<>("ID");
+        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
+
+        TableColumn<Reservation, Integer> colClient = new TableColumn<>("Client ID");
+        colClient.setCellValueFactory(new PropertyValueFactory<>("clientId"));
+
+        TableColumn<Reservation, Integer> colChambre = new TableColumn<>("Chambre ID");
+        colChambre.setCellValueFactory(new PropertyValueFactory<>("chambreId"));
+
+        TableColumn<Reservation, String> colDebut = new TableColumn<>("Date début");
+        colDebut.setCellValueFactory(new PropertyValueFactory<>("dateDebut"));
+
+        TableColumn<Reservation, String> colFin = new TableColumn<>("Date fin");
+        colFin.setCellValueFactory(new PropertyValueFactory<>("dateFin"));
+
+        table.getColumns().addAll(colId, colClient, colChambre, colDebut, colFin);
+
+        try {
+            Connection conn = ConnexionDB.connect();
+            ReservationDAO reservationDAO = new ReservationDAO(conn);
+            ObservableList<Reservation> reservations = FXCollections.observableArrayList(reservationDAO.getAllReservations());
+            table.setItems(reservations);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        Button btnGenerer = new Button("Générer PDF");
+        btnGenerer.setStyle("-fx-background-color: #e53935; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+        btnGenerer.setOnAction(e -> {
+            Reservation selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                try (Connection conn = ConnexionDB.connect()) {
+                    Client client = ClientDAO.findById(selected.getClientId());
+                    genererPDF(selected, client);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    showAlert("Erreur : " + ex.getMessage());
+                }
+            } else {
+                showAlert("Veuillez sélectionner une réservation.");
+            }
+        });
+
+        VBox root = new VBox(15, table, btnGenerer);
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(20));
+        root.setStyle("-fx-background-color: #1e1e1e;");
+
+        stage.setTitle("Facturation - Génération de PDF");
+        stage.setScene(new Scene(root, 800, 400, Color.BLACK));
+        stage.show();
+    }
+
+    private void genererPDF(Reservation reservation, Client client) throws Exception {
+        Document document = new Document();
+        String nomFichier = "reservation_" + reservation.getId() + ".pdf";
+        PdfWriter.getInstance(document, new FileOutputStream(nomFichier));
+        document.open();
+
+        // Logo
+        Image logo = Image.getInstance("src/controller/hotel_logo.png");
+        logo.scaleToFit(100, 100);
+        logo.setAlignment(Image.ALIGN_CENTER);
+        document.add(logo);
+
+        // Titre
+        Font titreFont = new Font(Font.FontFamily.HELVETICA, 22, Font.BOLD);
+        Paragraph titre = new Paragraph("Facture de Réservation", titreFont);
+        titre.setAlignment(Element.ALIGN_CENTER);
+        titre.setSpacingAfter(20);
+        document.add(titre);
+
+        // Tableau
+        PdfPTable table = new PdfPTable(4);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(10);
+
+        Font boldFont = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD);
+        table.addCell(new PdfPCell(new Phrase("Nom du client", boldFont)));
+        table.addCell(new PdfPCell(new Phrase("ID Chambre", boldFont)));
+        table.addCell(new PdfPCell(new Phrase("Date début", boldFont)));
+        table.addCell(new PdfPCell(new Phrase("Date fin", boldFont)));
+
+        table.addCell(client.getNom() + " " + client.getPrenom());
+        table.addCell(String.valueOf(reservation.getChambreId()));
+        table.addCell(reservation.getDateDebut().toString());
+        table.addCell(reservation.getDateFin().toString());
+
+        document.add(table);
+
+        // Date de génération
+        Paragraph dateGen = new Paragraph("\nDate de génération : " + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        dateGen.setSpacingBefore(20);
+        document.add(dateGen);
+
+        // Signature
+        Paragraph signature = new Paragraph("\nSignature Hôtel", boldFont);
+        signature.setAlignment(Element.ALIGN_RIGHT);
+        document.add(signature);
+
+        System.out.println("PDF généré avec succès : " + nomFichier);
+        document.close();
+    }
+
+    private void showAlert(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Avertissement");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.show();
+    }
+}

@@ -1,3 +1,4 @@
+ Affichage-des-chambres-disponibles-et-réservées
 package model;
 
 public class Chambre {
@@ -45,6 +46,110 @@ public class Chambre {
 
     public void setStatut(String statut) {
         this.statut = statut;
+    }
+}
+
+
+package database;
+
+import model.Chambre;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ChambreDAO {
+    private Connection conn;
+
+    public ChambreDAO(Connection conn) {
+        this.conn = conn;
+    }
+
+    // Lister toutes les chambres
+    public List<Chambre> getAllChambres() {
+        List<Chambre> chambres = new ArrayList<>();
+        String sql = "SELECT * FROM chambres";
+
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Chambre ch = new Chambre(
+                        rs.getInt("id"),
+                        rs.getString("numero"),
+                        rs.getString("type"),
+                        rs.getString("statut")
+                );
+                chambres.add(ch);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return chambres;
+    }
+
+    // Ajouter une chambre
+    public boolean ajouterChambre(Chambre chambre) {
+        String sql = "INSERT INTO chambres (numero, type, statut) VALUES (?, ?, ?)";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, chambre.getNumero());
+            stmt.setString(2, chambre.getType());
+            stmt.setString(3, chambre.getStatut());
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Supprimer une chambre
+    public boolean supprimerChambre(int id) {
+        String sql = "DELETE FROM chambres WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Modifier une chambre
+    public boolean modifierChambre(Chambre chambre) {
+        String sql = "UPDATE chambres SET numero = ?, type = ?, statut = ? WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, chambre.getNumero());
+            stmt.setString(2, chambre.getType());
+            stmt.setString(3, chambre.getStatut());
+            stmt.setInt(4, chambre.getId());
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Vérifier l'existence du numéro
+    public boolean existeNumero(String numero) {
+        String sql = "SELECT COUNT(*) FROM chambres WHERE numero = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, numero);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
 
